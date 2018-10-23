@@ -17,8 +17,8 @@ class Dataset:
             self.classes_num = {des: num for num, des in self.classes.items()}
             # python 3.x use items() , 2.x use iteritems()
             self.wav_files = self.root + 'wav'
-            self.NN_inputs = self.root + 'NN_inputs'
-            #self.get_dataset('berlin')
+            self.NN_inputs = self.root + 'NN_inputs/'
+            self.get_dataset('berlin')
 
     def get_dataset(self, type):
         for speaker in self.speakers:
@@ -29,14 +29,18 @@ class Dataset:
             self.train_path.append(speakerhome + 'train.txt')
             self.train_path.append(speakerhome + 'val.txt')
 
+            # speaker independent training and validation
+            # train files describe wav files and its class
+            # validation files the same as train files
             train_file = open(speakerhome + 'train.txt', 'a')
             val_file = open(speakerhome + 'val.txt','a')
 
             for wav in os.listdir(self.wav_files):
+                # generate lists of train files and validation files
                 if self.return_speaker(type, wav) == speaker:
-                    val_file.write('%s %s\n' %(speakerhome + wav, self.return_class(type, wav)))
+                    val_file.write('%s %s\n' %(self.NN_inputs + wav, self.return_class(type, wav)))
                 else:
-                    train_file.write('%s %s\n' %( speakerhome + wav, self.return_class(type, wav)))
+                    train_file.write('%s %s\n' %(self.NN_inputs + wav, self.return_class(type, wav)))
 
             train_file.close()
             val_file.close()
@@ -52,4 +56,4 @@ class Dataset:
             return self.classes_num[wav[5]]
 
 
-#dataset = Dataset('berlin')
+dataset = Dataset('berlin')
