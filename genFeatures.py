@@ -7,6 +7,7 @@ generate features
 from dataset import *
 import numpy as np
 import os
+import csv
 
 
 def genFeatures(wav, wav_file, wav_feature_folder):
@@ -22,13 +23,44 @@ def genFeatures(wav, wav_file, wav_feature_folder):
     os.system(cmd)
 
 
+def read_frame_csv(type, wav, wav_feature_folder):
+    # read csv files and seprate them in 300 frames a file.
+    # short than 300 frames using np.pad() to complete
+    # longer than 300 frames, cut into blocks every 300 frames,
+    # throw the last part < 150, otherwise keep.
+    features_np_path = wav_feature_folder + 'np/'
+    if not os.path.exists(features_np_path):
+        os.makedirs(features_np_path)
+    csvFile = open(wav_feature_folder + wav[:-4] + '_frame.csv', 'r')
+    reader = csv.reader(csvFile)
+    features_np = []
+    for item in reader:
+        features_np.append(item[0].split(';')[1:])
+    features_np = np.array(features_np, dtype='float32')
+    frames = len(features_np)
+    blocks, last_block = divmod(frames, 300)
+    if blocks == 0:
+        features_np = np.pad(features_np, ((0, 300 - frames), (0, 0)), 'constant')
+        np.save(features_np_path + str(return_class(type, wav)[1]) + "0.npy", features_np)
+    else:
+        for i in range(blocks):
+            np.save(features_np_path + str(return_class(type, wav)[1]) + str(i) + '.npy', features_np[i * 300:i * 300 + 299])
+        if last_block >= 150:
+            features_np = np.pad(features_np, ((0, 300 - last_block), (0, 0)), 'constant')
+            np.save(features_np_path + str(return_class(type, wav)[1]) + str(blocks) + '.npy', features_np[blocks * 300:blocks * 300 + 299])
+
+
 def main():
     berlin_dataset = Dataset('berlin')
+    #berlin_dataset.delete_features_np()
     for wav in os.listdir(berlin_dataset.wav_files):
         wav_file = '%s/%s' % (berlin_dataset.wav_files, wav)
         wav_feature_folder = '%s/%s/' % (berlin_dataset.NN_inputs, wav)
 
-        genFeatures(wav, wav_file, wav_feature_folder)
+        #genFeatures(wav, wav_file, wav_feature_folder)
+        #read_frame_csv(berlin_dataset.type, wav, wav_feature_folder, )
+
+    berlin_dataset.record_train_val_segment_files()
 
 
 main()
