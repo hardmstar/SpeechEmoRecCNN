@@ -11,6 +11,13 @@ import csv
 
 
 def genFeatures(wav, wav_file, wav_feature_folder):
+    '''
+
+    :param wav: wav file name, string
+    :param wav_file: wav file path, string
+    :param wav_feature_folder: the folder contains wav features, include frame features and overall features
+    :return: none
+    '''
     if not os.path.exists(wav_feature_folder):
         os.makedirs(wav_feature_folder)
     cmd = 'smilextract -C F:/useful/opensmile-2.3.0/config/gemaps/eGeMAPSv01a.conf -I ' \
@@ -44,22 +51,24 @@ def read_frame_csv(type, wav, wav_feature_folder):
         np.save(features_np_path + str(return_class(type, wav)[1]) + "0.npy", features_np)
     else:
         for i in range(blocks):
-            np.save(features_np_path + str(return_class(type, wav)[1]) + str(i) + '.npy', features_np[i * 300:i * 300 + 299])
+            np.save(features_np_path + str(return_class(type, wav)[1]) + str(i) + '.npy', features_np[i * 300:(i + 1) * 300])
         if last_block >= 150:
             features_np = np.pad(features_np, ((0, 300 - last_block), (0, 0)), 'constant')
-            np.save(features_np_path + str(return_class(type, wav)[1]) + str(blocks) + '.npy', features_np[blocks * 300:blocks * 300 + 299])
+            np.save(features_np_path + str(return_class(type, wav)[1]) + str(blocks) + '.npy', features_np[blocks * 300:(blocks+1) * 300 ])
 
 
 def main():
     berlin_dataset = Dataset('berlin')
-    #berlin_dataset.delete_features_np()
+    # delete all numpy files of wav feature
+    berlin_dataset.delete_features_np()
     for wav in os.listdir(berlin_dataset.wav_files):
         wav_file = '%s/%s' % (berlin_dataset.wav_files, wav)
         wav_feature_folder = '%s/%s/' % (berlin_dataset.NN_inputs, wav)
-
-        #genFeatures(wav, wav_file, wav_feature_folder)
-        #read_frame_csv(berlin_dataset.type, wav, wav_feature_folder, )
-
+        # generate wav frame and overall features with opensmile
+        genFeatures(wav, wav_file, wav_feature_folder)
+        # split frame features into 300 frames a block
+        read_frame_csv(berlin_dataset.type, wav, wav_feature_folder, )
+    # generate train_segments.txt and val_segments.txt
     berlin_dataset.record_train_val_segment_files()
 
 

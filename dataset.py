@@ -77,8 +77,9 @@ class Dataset:
             files = os.listdir(speakerhome)
             for f in files:
                 if os.path.isfile(speakerhome+f):
-                    os.remove(speakerhome+f)
-                    print(speakerhome+f+' removed')
+                    if f == 'train.txt' or f == 'val.txt':
+                        os.remove(speakerhome+f)
+                        print(speakerhome+f+' removed')
 
 
     def return_speaker(self, wav):
@@ -97,6 +98,7 @@ class Dataset:
         after genFeatures() and read_frame_csv() in genFeatures.py,
         run record_train_val_segment_files() recording all blocks of features
         '''
+        self.delete_train_val_segment_files()
         for speaker in self.speakers:
             speakerhome = self.root + speaker + '/'
             train_segment_file = open(speakerhome + 'train_segments.txt', 'a')
@@ -116,8 +118,19 @@ class Dataset:
             self.train_segment_files_path.append(speakerhome+'train_segments.txt')
             self.val_segment_files_path.append(speakerhome+'val_segments.txt')
 
+    def delete_train_val_segment_files(self):
+        for speaker in self.speakers:
+            speakerhome = self.root + speaker + '/'
+            files = os.listdir(speakerhome)
+            for f in files:
+                if os.path.isfile(speakerhome+f):
+                    if f == 'train_segments.txt' or f == 'val_segments.txt':
+                        os.remove(speakerhome+f)
+
+
 
 def return_class(type, wav):
     if type == 'berlin':
         return EMODB_classes_num[wav[5]], wav[5]
-dataset = Dataset('berlin')
+
+# dataset = Dataset('berlin')
