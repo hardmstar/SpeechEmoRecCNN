@@ -67,5 +67,7 @@ if __name__ == '__main__':
     filewriter_path = berlin.root + '/tmp/tensorboard'
     checkpoints_path = berlin.root + '/tmp/checkpoints'
 
-# x = tf.placeholder(tf.float32, [None, 300,], name='input')
-# y = tf.placeholder(tf.float32, [None, len(berlin.classes]))
+    # x = tf.placeholder(tf.float32, [None, 300,], name='input')
+    # y = tf.placeholder(tf.float32, [None, len(berlin.classes]))
+    for speaker in berlin.speakers:
+        train_session(berlin, speaker)
