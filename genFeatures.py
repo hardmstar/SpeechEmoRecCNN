@@ -66,7 +66,7 @@ def main():
         wav_feature_folder = '%s/%s/' % (berlin_dataset.NN_inputs, wav)
         # generate wav frame and overall features with opensmile
         genFeatures(wav, wav_file, wav_feature_folder)
-        # split frame features into 300 frames a block
+        # split frame features into 300 frames a block, 23 features per frame
         read_frame_csv(berlin_dataset.type, wav, wav_feature_folder, )
     # generate train_segments.txt and val_segments.txt
     berlin_dataset.record_train_val_segment_files()
