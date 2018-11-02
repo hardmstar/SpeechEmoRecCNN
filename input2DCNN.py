@@ -100,7 +100,7 @@ def train_session(ob_dataset , speaker, checkpoints_path, batch_size):
 
     # https://blog.csdn.net/sinat_33761963/article/details/57416517
     x = tf.placeholder("float32",[None,300,23,1], name='x')
-    y_ = tf.placeholder("float", [None, len(ob_dataset.classes)],name='y')
+    y_ = tf.placeholder("float", [None, len(ob_dataset.classes)],name='y_')
     keep_prob = tf.placeholder(tf.float32)
     # convolution layer and pool layer
     w_conv1 = weight_variable([5, 5, 1, 32])  # ? ? ? why 5
@@ -141,11 +141,12 @@ def train_session(ob_dataset , speaker, checkpoints_path, batch_size):
                 train_step.run( feed_dict={x: data_batch, y_: label_batch, keep_prob: 0.5})
 
         # save check points , which include weights, bias etc
-        checkpoint_name = checkpoints_path+ 'model_epoch'+str(epoch)+'.ckpt'
+        checkpoint_name = checkpoints_path+ 'model_epoch'+str(1)+'.ckpt'
         saver = tf.train.Saver()
         save_path = saver.save(sess, checkpoint_name)
 
-    checkpoint_file = tf.train.latest_checkpoint(checkpoint_name)
+    tf.reset_default_graph()
+    checkpoint_file = tf.train.latest_checkpoint('F:/useful/python/speechEmoRec/EMODB/tmp/checkpoints')
     with tf.Session() as sess:
         new_saver = tf.train.import_meta_graph("{}.meta".format(checkpoint_file))
         new_saver.restore(sess, checkpoint_file)
@@ -156,8 +157,9 @@ def train_session(ob_dataset , speaker, checkpoints_path, batch_size):
         sess.run(val_init_op)
         for step in range(2):
             data_batch, label_batch = sess.run(next_batch)
-            sess.run(acc,feed_dict={x:data_batch,y_:label_batch})
-            print(acc)
+            # sess.run(acc,feed_dict={x:data_batch,y_:label_batch})
+            val_accuracy = acc.eval(feed_dict={x:data_batch,y_:label_batch})
+            print('val_accuracy: %g' % (val_accuracy))
 
 
 
