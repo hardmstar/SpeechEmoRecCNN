@@ -181,6 +181,8 @@ def train_seesion(ob_dataset, speaker, filewriter_path, checkpoints_path, num_ep
             test_loss /= test_count
             print('speaker {} in epoch {}, test_acc={}, test_loss={}'.format(speaker, epoch, test_acc, test_loss))
     writer.close()
+    graph = tf.graph_util.convert_variables_to_constants(sess,sess.graph_def, ['test/prob'])
+    tf.train.write_graph(graph, '.',ob_dataset.root+speaker+'/alexnet.pb',as_text=False)
             
 if __name__ == '__main__':
     berlin = Dataset('berlin')
