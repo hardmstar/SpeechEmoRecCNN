@@ -75,7 +75,7 @@ def recurrent_neural_network(x, NUM_CLASSES):
     return fully_connected_2
 
 
-def train_seesion(ob_dataset, speaker, checkpoints_path, num_epochs, batch_size):
+def train_seesion(ob_dataset, speaker, filewriter_path, checkpoints_path, num_epochs, batch_size):
     if not os.path.isdir(checkpoints_path):
         os.makedirs(checkpoints_path)
 
@@ -109,27 +109,35 @@ def train_seesion(ob_dataset, speaker, checkpoints_path, num_epochs, batch_size)
             print(sess.run(next_batch))
     '''
     ##########
-    x = tf.placeholder('float32', [None, 300, 23, 1], name='input_x')
-    y = tf.placeholder('float32', [None, num_classes], name='label_y')
+    with tf.name_scope('input'):
+        x = tf.placeholder('float32', [None, 300, 23, 1], name='input_x')
+        y = tf.placeholder('float32', [None, num_classes], name='label_y')
 
     logits = recurrent_neural_network(x, num_classes)
     y_prediction = tf.nn.softmax(logits)
-    # loss function
-    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=y_prediction, labels=y))
-    # optimizer
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
+    with tf.name_scope('cross_entropy'):
+        # loss function
+        loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=y_prediction, labels=y))
 
+    with tf.name_scope('train_optimize'):
+        # optimizer
+        optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
+        train_op = optimizer.minimize(loss)
 
-    train_op = optimizer.minimize(loss)
     # accuracy
     with tf.name_scope('accuracy'):
         correct_pred = tf.equal(tf.argmax(y_prediction, 1), tf.argmax(y, 1))
         accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
     tf.summary.scalar('accuracy', accuracy)
-    
+
+    # initialize filewriter
+    writer = tf.summary.FileWriter(filewriter_path)
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
-    
+
+        # add the model graph to tensorboard
+        writer.add_graph(sess.graph)
+
         # for epoch in range(num_epochs)
         for epoch in range(2):
             total_cost = 0
@@ -172,6 +180,7 @@ def train_seesion(ob_dataset, speaker, checkpoints_path, num_epochs, batch_size)
             test_acc /= test_count
             test_loss /= test_count
             print('speaker {} in epoch {}, test_acc={}, test_loss={}'.format(speaker, epoch, test_acc, test_loss))
+    writer.close()
             
 if __name__ == '__main__':
     berlin = Dataset('berlin')
@@ -185,4 +194,4 @@ if __name__ == '__main__':
 
     for speaker in berlin.speakers:
         # train_seesion(ob_dataset, speaker, checkpoints_path, num_epochs, batch_size)
-        train_seesion(berlin, speaker, checkpoints_path, num_epochs, batch_size)
+        train_seesion(berlin, speaker, filewriter_path, checkpoints_path, num_epochs, batch_size)
