@@ -140,8 +140,8 @@ def train_seesion(ob_dataset, speaker, filewriter_path, checkpoints_path, num_ep
         # add the model graph to tensorboard
         writer.add_graph(sess.graph)
 
-        # for epoch in range(num_epochs)
-        for epoch in range(2):
+        for epoch in range(num_epochs):
+        # for epoch in range(2):
             total_cost = 0
     
             # train start
@@ -150,8 +150,8 @@ def train_seesion(ob_dataset, speaker, filewriter_path, checkpoints_path, num_ep
             train_acc = 0
             train_count = 0
             train_loss = 0
-            # for i in range(tr_data.data_size // batch_size):
-            for i in range(2):
+            for i in range(tr_data.data_size // batch_size):
+            # for i in range(2):
                 batch_x, batch_y = sess.run(next_batch)
                 # logits_return, y_prediction_return = sess.run((logits, y_prediction),feed_dict={x: batch_x, y: batch_y})
                 train_op_return, train_acc_value, train_loss_value = sess.run((train_op, accuracy, loss),
@@ -199,4 +199,4 @@ if __name__ == '__main__':
     for speaker in berlin.speakers:
         # train_seesion(ob_dataset, speaker, checkpoints_path, num_epochs, batch_size)
         train_seesion(berlin, speaker, filewriter_path, checkpoints_path, num_epochs, batch_size)
-        break
+
