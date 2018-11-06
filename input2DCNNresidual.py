@@ -69,8 +69,10 @@ def recurrent_neural_network(x, NUM_CLASSES):
         b_fc1 = tf.get_variable('b_fc1', shape=[128], dtype=tf.float32)
         b_fc2 = tf.get_variable('b_fc2', shape=[NUM_CLASSES], dtype=tf.float32)
     
-        fully_connected_1 = tf.matmul(flattened, w_fc1) + b_fc1
-        fully_connected_2 = tf.matmul(fully_connected_1, w_fc2) + b_fc2
+    # fully_connected_1 = tf.matmul(flattened, w_fc1) + b_fc1
+    # fully_connected_2 = tf.matmul(fully_connected_1, w_fc2) + b_fc2
+    fully_connected_1 = tf.nn.xw_plus_b(flattened, w_fc1, b_fc1,name='fc1')
+    fully_connected_2 = tf.nn.xw_plus_b(fully_connected_1, w_fc2, b_fc2,name='fc2')
 
     return fully_connected_2
 
