@@ -68,11 +68,11 @@ def recurrent_neural_network(x, NUM_CLASSES):
         w_fc2 = tf.get_variable('w_fc2', shape=[128, NUM_CLASSES], dtype=tf.float32)
         b_fc1 = tf.get_variable('b_fc1', shape=[128], dtype=tf.float32)
         b_fc2 = tf.get_variable('b_fc2', shape=[NUM_CLASSES], dtype=tf.float32)
-    
-    # fully_connected_1 = tf.matmul(flattened, w_fc1) + b_fc1
-    # fully_connected_2 = tf.matmul(fully_connected_1, w_fc2) + b_fc2
-    fully_connected_1 = tf.nn.xw_plus_b(flattened, w_fc1, b_fc1,name='fc1')
-    fully_connected_2 = tf.nn.xw_plus_b(fully_connected_1, w_fc2, b_fc2,name='fc2')
+    with tf.name_scope('fully_connection_layers'):
+        # fully_connected_1 = tf.matmul(flattened, w_fc1) + b_fc1
+        # fully_connected_2 = tf.matmul(fully_connected_1, w_fc2) + b_fc2
+        fully_connected_1 = tf.nn.xw_plus_b(flattened, w_fc1, b_fc1,name='fc1')
+        fully_connected_2 = tf.nn.xw_plus_b(fully_connected_1, w_fc2, b_fc2,name='fc2')
 
     return fully_connected_2
 
@@ -115,11 +115,11 @@ def train_seesion(ob_dataset, speaker, filewriter_path, checkpoints_path, num_ep
         x = tf.placeholder('float32', [None, 300, 23, 1], name='input_x')
         y = tf.placeholder('float32', [None, num_classes], name='label_y')
 
-    logits = recurrent_neural_network(x, num_classes)
-    y_prediction = tf.nn.softmax(logits)
+    with tf.name_scope('output'):
+        logits = recurrent_neural_network(x, num_classes)
     with tf.name_scope('cross_entropy'):
         # loss function
-        loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=y_prediction, labels=y))
+        loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=y))
 
     with tf.name_scope('train_optimize'):
         # optimizer
@@ -128,7 +128,7 @@ def train_seesion(ob_dataset, speaker, filewriter_path, checkpoints_path, num_ep
 
     # accuracy
     with tf.name_scope('accuracy'):
-        correct_pred = tf.equal(tf.argmax(y_prediction, 1), tf.argmax(y, 1))
+        correct_pred = tf.equal(tf.argmax(logits, 1), tf.argmax(y, 1))
         accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
     tf.summary.scalar('accuracy', accuracy)
 
@@ -182,9 +182,9 @@ def train_seesion(ob_dataset, speaker, filewriter_path, checkpoints_path, num_ep
             test_acc /= test_count
             test_loss /= test_count
             print('speaker {} in epoch {}, test_acc={}, test_loss={}'.format(speaker, epoch, test_acc, test_loss))
-    writer.close()
-    graph = tf.graph_util.convert_variables_to_constants(sess,sess.graph_def, ['test/prob'])
-    tf.train.write_graph(graph, '.',ob_dataset.root+speaker+'/alexnet.pb',as_text=False)
+        writer.close()
+        graph = tf.graph_util.convert_variables_to_constants(sess,sess.graph_def, ['output/fully_connection_layers/fc2'])
+        tf.train.write_graph(graph, '.',ob_dataset.root+speaker+'/residual_model.pb',as_text=False)
             
 if __name__ == '__main__':
     berlin = Dataset('berlin')
@@ -199,3 +199,4 @@ if __name__ == '__main__':
     for speaker in berlin.speakers:
         # train_seesion(ob_dataset, speaker, checkpoints_path, num_epochs, batch_size)
         train_seesion(berlin, speaker, filewriter_path, checkpoints_path, num_epochs, batch_size)
+        break

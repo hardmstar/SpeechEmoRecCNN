@@ -31,6 +31,8 @@ class Dataset:
             self.get_dataset()
             #self.generate_train_val_files()
 
+        self.model_path = []
+
 
     def get_dataset(self):
         for speaker in self.speakers:
@@ -63,6 +65,8 @@ class Dataset:
             val_file.close()
 
     def delete_features_np(self):
+        # emodb/03/nn_inputs/03Faxx.wav/np/xx.np
+        # features as cnn inputs
         for wav in self.wav_files_list:
             feature_np_path = self.NN_inputs + wav + '/np/'
             features_np = os.listdir(feature_np_path)
@@ -127,6 +131,29 @@ class Dataset:
                     if f == 'train_segments.txt' or f == 'val_segments.txt':
                         os.remove(speakerhome+f)
 
+    def generate_model_path(self,model):
+        # emodb/03/xx_model.pb
+        self.model_path = []
+        for speaker in self.speakers:
+            self.model_path.append(self.root+speaker+'/'+model+'_model.pb')
+
+
+    def generate_model_features_np(self):
+        # ann model output features
+        self.train_segments_model_path = []
+        self.val_segments_model_path = []
+        for speaker in self.speakers:
+            self.train_segments_model_path.append(self.root+speaker+'train_segments.npy')
+            self.val_segments_model_path.append(self.root+speaker+'val_segments.npy')
+
+    def delete_model_features_np(self):
+        for speaker in self.speakers:
+            speakerhome = self.root + speaker + '/'
+            files = os.listdir(speakerhome)
+            for f in files:
+                if os.path.isfile(speakerhome+f):
+                    if f == 'train_segments.npy' or f == 'val_segments.npy':
+                        os.remove(speakerhome+f)
 
 
 def return_class(type, wav):
