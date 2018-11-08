@@ -188,6 +188,7 @@ def train_seesion(ob_dataset, speaker, filewriter_path, checkpoints_path, num_ep
                 print('fc1',sess.run(fc1_layer,feed_dict={x:batch_x}))
                 '''
                 ################################
+                print('speaker {} in epoch {}, batch {}'.format(speaker, epoch, i))
             train_loss /= train_count
             train_acc /= train_count
             print('speaker {} in epoch {}, train_acc={}, train_loss={}'.format(speaker, epoch, train_acc, train_loss))
