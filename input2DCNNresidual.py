@@ -6,7 +6,7 @@ import numpy as np
 import os
 from wavDataGenerator import *
 
-learning_rate = 1e-3
+learning_rate = 1e-5
 
 
 def residual_block(x, num_input_filters, num_output_filters, block_num):
@@ -38,7 +38,8 @@ def residual_block(x, num_input_filters, num_output_filters, block_num):
                                               shape=[num_output_filters],
                                               dtype=tf.float32)
             x = tf.nn.conv2d(x, w_conv_increase, strides=[1,1,1,1], padding='SAME') + b_conv_increase
-    output = tf.add(x, weight_layer_2)
+    with tf.name_scope('residual_add_output'+str(block_num)):
+        output = tf.add(x, weight_layer_2,name='add')
     return output
 
 
@@ -88,7 +89,8 @@ def train_seesion(ob_dataset, speaker, filewriter_path, checkpoints_path, num_ep
                                num_class=num_classes)
     val_data = wavDataGenerator(ob_dataset.root + speaker + '/val_segments.txt',
                                 batch_size=batch_size,
-                                num_class=num_classes)
+                                num_class=num_classes,
+                                shuffle=False)
 
     # 可重新初始化迭代器可以通过多个不同的 Dataset 对象进行初始化。
     # https://www.tensorflow.org/programmers_guide/datasets?hl=zh-cn
@@ -119,10 +121,14 @@ def train_seesion(ob_dataset, speaker, filewriter_path, checkpoints_path, num_ep
         logits = recurrent_neural_network(x, num_classes)
     with tf.name_scope('cross_entropy'):
         # loss function
-        loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=y))
+        num = tf.convert_to_tensor(tf.constant(1e-10),dtype=tf.float32)
+        loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits+num, labels=y))
+    # tf.summary.scalar('loss', loss)
+    loss_summary = tf.summary.histogram("loss", loss)
 
     with tf.name_scope('train_optimize'):
         # optimizer
+
         optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
         train_op = optimizer.minimize(loss)
 
@@ -130,10 +136,15 @@ def train_seesion(ob_dataset, speaker, filewriter_path, checkpoints_path, num_ep
     with tf.name_scope('accuracy'):
         correct_pred = tf.equal(tf.argmax(logits, 1), tf.argmax(y, 1))
         accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
-    tf.summary.scalar('accuracy', accuracy)
+    # tf.summary.scalar('accuracy', accuracy)
+    accuracy_summary = tf.summary.histogram('accuracy', accuracy)
+
+    # merged_summary = tf.summary.merge_all()
+    merged_summary = tf.summary.merge([accuracy_summary,loss_summary])
 
     # initialize filewriter
     writer = tf.summary.FileWriter(filewriter_path)
+
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
 
@@ -145,7 +156,7 @@ def train_seesion(ob_dataset, speaker, filewriter_path, checkpoints_path, num_ep
             total_cost = 0
     
             # train start
-            print('train start')
+            print(speaker,' train start. epoch:', epoch)
             sess.run(train_init_op)
             train_acc = 0
             train_count = 0
@@ -159,6 +170,24 @@ def train_seesion(ob_dataset, speaker, filewriter_path, checkpoints_path, num_ep
                 train_loss += train_loss_value
                 train_acc = train_acc_value
                 train_count += 1
+                ###### summary#################
+                summary_ = sess.run(merged_summary, feed_dict={x :batch_x, y: batch_y})
+                writer.add_summary(summary_,epoch * batch_size + i)
+                ###############################
+                ###### every layer ############
+                '''
+                residual_add_outputlayer = sess.graph.get_tensor_by_name('output/residual_add_output2/add:0')
+                print('rs2',sess.run(residual_add_outputlayer,feed_dict={x:batch_x}))
+                residual_add_outputlayer = sess.graph.get_tensor_by_name('output/residual_add_output5/add:0')
+                print('rs5',sess.run(residual_add_outputlayer,feed_dict={x:batch_x}))
+                residual_add_outputlayer = sess.graph.get_tensor_by_name('output/residual_add_output8/add:0')
+                print('rs8',sess.run(residual_add_outputlayer,feed_dict={x:batch_x}))
+                residual_add_outputlayer = sess.graph.get_tensor_by_name('output/residual_add_output11/add:0')
+                print('rs11',sess.run(residual_add_outputlayer,feed_dict={x:batch_x}))
+                fc1_layer = sess.graph.get_tensor_by_name('output/fully_connection_layers/fc1:0')
+                print('fc1',sess.run(fc1_layer,feed_dict={x:batch_x}))
+                '''
+                ################################
             train_loss /= train_count
             train_acc /= train_count
             print('speaker {} in epoch {}, train_acc={}, train_loss={}'.format(speaker, epoch, train_acc, train_loss))
@@ -167,13 +196,13 @@ def train_seesion(ob_dataset, speaker, filewriter_path, checkpoints_path, num_ep
             scope_now = tf.get_variable_scope()
             scope_now.reuse_variables()
             # validation start
-            print('start validation')
+            print(speaker,' start validation, epoch ',epoch)
             sess.run(val_init_op)
             test_acc = 0
             test_count = 0
             test_loss = 0
-            # for _ in range(val_data.data_size // batch_size):
-            for _ in range(2):
+            for _ in range(val_data.data_size // batch_size):
+            # for _ in range(2):
                 batch_x, batch_y = sess.run(next_batch)
                 acc, loss_value = sess.run((accuracy, loss), feed_dict={x: batch_x, y: batch_y})
                 test_loss += loss_value
@@ -193,10 +222,12 @@ if __name__ == '__main__':
     batch_size = 30
     dropout_rate = 0.5
 
-    filewriter_path = berlin.root + '/residual/tensorboard'
-    checkpoints_path = berlin.root + '/residual/checkpoints_path'
+    filewriter_path = berlin.root + '/residual/tensorboard/'
+    checkpoints_path = berlin.root + '/residual/checkpoints_path/'
 
     for speaker in berlin.speakers:
-        # train_seesion(ob_dataset, speaker, checkpoints_path, num_epochs, batch_size)
-        train_seesion(berlin, speaker, filewriter_path, checkpoints_path, num_epochs, batch_size)
+        train_seesion(berlin, speaker, filewriter_path+speaker, checkpoints_path+speaker, num_epochs, batch_size)
+        #train_seesion(berlin, '08', filewriter_path + speaker, checkpoints_path + speaker, num_epochs, batch_size)
+        #train_seesion(berlin, '09', filewriter_path + speaker, checkpoints_path + speaker, num_epochs, batch_size)
+
 

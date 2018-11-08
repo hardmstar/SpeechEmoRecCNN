@@ -15,6 +15,7 @@ if __name__ == '__main__':
     for i in range(len(berlin.speakers)):
         train_features, labels = get_fc1.get_fc1(berlin.model_path[i],
                 berlin.train_path[i])
+        # train_features, labels = get_fc1.get_fc1('EMODB/03/residual_model_backup.pb', berlin.train_path[i])
         np.save(berlin.train_segments_model_path[i],train_features)
         print('save speaker {} model train features segments in {}'.format(berlin.speakers[i], berlin.train_segments_model_path))
         val_features, labels = get_fc1.get_fc1(berlin.model_path[i],

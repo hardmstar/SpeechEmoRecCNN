@@ -27,6 +27,7 @@ def get_fc1(graph_filename, load_filename):
             #f_np_per_wav = tf.convert_to_tensor(f_np_per_wav,dtype=tf.float32)
             #f_np_per_wav = tf.reshape(f_np_per_wav,shape=[None,300,23,1])
             out = sess.run(fc1, feed_dict={input_x:f_np_per_wav})
+            # print(out)
             features.append(out)
     return features, labels
 
