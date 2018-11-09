@@ -116,9 +116,9 @@ def train_seesion(ob_dataset, speaker, filewriter_path, checkpoints_path, num_ep
     with tf.name_scope('input'):
         x = tf.placeholder('float32', [None, 300, 23, 1], name='input_x')
         y = tf.placeholder('float32', [None, num_classes], name='label_y')
-
-    with tf.name_scope('output'):
-        logits = recurrent_neural_network(x, num_classes)
+    with tf.device('/cpu:0'):
+        with tf.name_scope('output'):
+            logits = recurrent_neural_network(x, num_classes)
     with tf.name_scope('cross_entropy'):
         # loss function
         num = tf.convert_to_tensor(tf.constant(1e-10),dtype=tf.float32)
@@ -145,8 +145,18 @@ def train_seesion(ob_dataset, speaker, filewriter_path, checkpoints_path, num_ep
     # initialize filewriter
     writer = tf.summary.FileWriter(filewriter_path)
 
-    with tf.Session() as sess:
-        sess.run(tf.global_variables_initializer())
+    # initialize an saver for store model checkpoints
+    saver = tf.train.Saver()
+
+    # cpu resources
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.6)
+    config = tf.ConfigProto(gpu_options=gpu_options, log_device_placement=True)
+
+    with tf.Session(config=config) as sess:
+        if os.path.exists(checkpoints_path+'/model.ckpt'):
+            saver.restore(sess, checkpoints_path+'/model.ckpt')
+        else:
+            sess.run(tf.global_variables_initializer())
 
         # add the model graph to tensorboard
         writer.add_graph(sess.graph)
@@ -161,8 +171,9 @@ def train_seesion(ob_dataset, speaker, filewriter_path, checkpoints_path, num_ep
             train_acc = 0
             train_count = 0
             train_loss = 0
-            for i in range(tr_data.data_size // batch_size):
-            # for i in range(2):
+            train_batches_num = tr_data.data_size // batch_size
+            # for i in range(train_batches_num):
+            for i in range(2):
                 batch_x, batch_y = sess.run(next_batch)
                 # logits_return, y_prediction_return = sess.run((logits, y_prediction),feed_dict={x: batch_x, y: batch_y})
                 train_op_return, train_acc_value, train_loss_value = sess.run((train_op, accuracy, loss),
@@ -172,7 +183,7 @@ def train_seesion(ob_dataset, speaker, filewriter_path, checkpoints_path, num_ep
                 train_count += 1
                 ###### summary#################
                 summary_ = sess.run(merged_summary, feed_dict={x :batch_x, y: batch_y})
-                writer.add_summary(summary_,epoch * batch_size + i)
+                writer.add_summary(summary_,epoch * train_batches_num + i)
                 ###############################
                 ###### every layer ############
                 '''
@@ -212,6 +223,8 @@ def train_seesion(ob_dataset, speaker, filewriter_path, checkpoints_path, num_ep
             test_acc /= test_count
             test_loss /= test_count
             print('speaker {} in epoch {}, test_acc={}, test_loss={}'.format(speaker, epoch, test_acc, test_loss))
+            # save checkpoint of the model
+            saver.save(sess, checkpoints_path+'/model.ckpt')
         writer.close()
         graph = tf.graph_util.convert_variables_to_constants(sess,sess.graph_def, ['output/fully_connection_layers/fc2'])
         tf.train.write_graph(graph, '.',ob_dataset.root+speaker+'/residual_model.pb',as_text=False)
