@@ -20,13 +20,13 @@ def genFeatures(wav, wav_file, wav_feature_folder):
     '''
     if not os.path.exists(wav_feature_folder):
         os.makedirs(wav_feature_folder)
-    cmd = 'smilextract -C F:/useful/opensmile-2.3.0/config/gemaps/eGeMAPSv01a.conf -I ' \
-          + wav_file + ' -lldcsvoutput ' + wav_feature_folder + wav[:-4] + '_frame.csv' + ' -instname ' + wav \
-          + ' -timestampcsvlld 0 -headercsvlld 0'
+    cmd = ('smilextract -C E:/useful/audio/opensmile-2.3.0/opensmile-2.3.0/config/gemaps/eGeMAPSv01a.conf -I ' 
+          + wav_file + ' -lldcsvoutput ' + wav_feature_folder + wav[:-4] + '_frame.csv' + ' -instname ' + wav 
+          + ' -timestampcsvlld 0 -headercsvlld 0')
     os.system(cmd)
-    cmd = 'smilextract -C F:/useful/opensmile-2.3.0/config/gemaps/eGeMAPSv01a.conf -I ' \
-          + wav_file + ' -csvoutput ' + wav_feature_folder + wav[:-4] + '_statistic.csv' \
-          + ' -appendcsv 0 -timestampcsv 0 -headercsv 0'
+    cmd = ('smilextract -C E:/useful/audio/opensmile-2.3.0/opensmile-2.3.0/config/gemaps/eGeMAPSv01a.conf -I ' 
+          + wav_file + ' -csvoutput ' + wav_feature_folder + wav[:-4] + '_statistic.csv' 
+          + ' -appendcsv 0 -timestampcsv 0 -headercsv 0')
     os.system(cmd)
 
 
