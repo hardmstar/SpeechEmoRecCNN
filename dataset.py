@@ -69,6 +69,8 @@ class Dataset:
         # features as cnn inputs
         for wav in self.wav_files_list:
             feature_np_path = self.NN_inputs + wav + '/np/'
+            if not os.path.isdir(feature_np_path):
+                return
             features_np = os.listdir(feature_np_path)
             for f in features_np:
                 if os.path.isfile(feature_np_path+f):
@@ -78,6 +80,8 @@ class Dataset:
     def delete_train_val_files(self):
         for speaker in self.speakers:
             speakerhome = self.root + speaker + '/'
+            if not os.path.isdir(speakerhome):
+                return
             files = os.listdir(speakerhome)
             for f in files:
                 if os.path.isfile(speakerhome+f):
@@ -125,6 +129,8 @@ class Dataset:
     def delete_train_val_segment_files(self):
         for speaker in self.speakers:
             speakerhome = self.root + speaker + '/'
+            if not os.path.isdir(speakerhome):
+                return
             files = os.listdir(speakerhome)
             for f in files:
                 if os.path.isfile(speakerhome+f):
@@ -149,6 +155,8 @@ class Dataset:
     def delete_model_features_np(self):
         for speaker in self.speakers:
             speakerhome = self.root + speaker + '/'
+            if not os.path.isdir(speakerhome):
+                return
             files = os.listdir(speakerhome)
             for f in files:
                 if os.path.isfile(speakerhome+f):
