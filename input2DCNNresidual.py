@@ -247,6 +247,6 @@ if __name__ == '__main__':
             
             train_seesion(berlin, speaker, filewriter_path+speaker, checkpoints_path+speaker, num_epochs, batch_size)
         #train_seesion(berlin, '08', filewriter_path + speaker, checkpoints_path + speaker, num_epochs, batch_size)
-        #train_seesion(berlin, '09', filewriter_path + speaker, checkpoints_path + speaker, num_epochs, batch_size)
+        #train_seesion(berlin, '08', filewriter_path + speaker, checkpoints_path + speaker, num_epochs, batch_size)
 '''
 
