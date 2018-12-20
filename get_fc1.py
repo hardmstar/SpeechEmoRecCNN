@@ -15,6 +15,9 @@ from sklearn.svm import SVC
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.cross_validation import PredefinedSplit
+from sklearn.externals import joblib
+import pandas as pd
 import csv
 import matplotlib.pyplot as plt
 import time
@@ -157,26 +160,56 @@ def svm(speaker, X_train, y_train, X_test, y_test):
     Cs = 10 ** np.arange(num_C) * 1e-4
 
     # gamma for rbf
-    gammas = [1e-4, 1e-4, 1e-2, 1e-1, 1]
+    gammas = [1e-4, 1e-3, 1e-2, 1e-1, 1]
     param_grid = {'estimator__C':Cs, 'estimator__gamma':gammas}
 
+    train_val_features = np.concatenate((X_train,X_test), axis=0)
+    train_val_labels = np.concatenate((y_train, y_test), axis=0)
+    test_fold = np.zeros(train_val_features.shape[0])
+    test_fold[:X_train.shape[0]] = -1 # train set indexs are -1
+    ps = PredefinedSplit(test_fold=test_fold)
+
     model = OneVsRestClassifier(SVC(kernel='rbf'))
-    clf = GridSearchCV(model, param_grid)
-    clf = clf.fit(X_train, y_train)
-    train_score = clf.score(X_train, y_train)
-    test_score = clf.score(X_test, y_test)
-    clf_y_train = clf.predict(X_train)
-    clf_y_test = clf.predict(X_test)
-    print('speaker {} in svm classification, train accuracy: {}, test accuracy: {}'.format(speaker, train_score,
-                                                                                            test_score))
+    clf = GridSearchCV(estimator=model, param_grid=param_grid, cv=ps)
+    clf = clf.fit(train_val_features, train_val_labels)
+#    train_score = clf.score(X_train, y_train)
+#    test_score = clf.score(X_test, y_test)
+#    clf_y_train = clf.predict(X_train)
+#    clf_y_test = clf.predict(X_test)
+#    print('speaker {} in svm classification, train accuracy: {}, test accuracy: {}'.format(speaker, train_score,test_score))
     # means = clf.cv_results_['mean_test_score']
     # stds = clf.cv_results_['std_test_score']
     # for mean, std, params in zip(means, stds, clf.cv_results_['params']):
     #    print('%0.3f (+/-%0.3f) for %r' % (mean, std * 2, params))
-    print('best params are {}'.format(clf.best_params_))
-    print(classification_report(y_test, clf_y_test))
-    return train_score, test_score, clf_y_train, clf_y_test
+    #print('best params are {}'.format(clf.best_params_))
+    #print(classification_report(y_test, clf_y_test))
+    return clf #, train_score, test_score, clf_y_train, clf_y_test
 
+def get_SVMs(dt):
+    # dt means dataset
+    dir_name = os.path.dirname(os.path.abspath('get_fc1.py'))
+    for speaker in dt.speakers:
+        print('svm speaker '+speaker )
+        speaker_path = dir_name + '/' + dt.root + '/' + speaker
+        X_train = np.load(speaker_path + '/train_np_features_fc1.npy')
+        _, y_train = np.asarray(load_inputs(speaker_path+'/train_segments.txt'))
+        X_test = np.load(speaker_path + '/val_np_features_fc1.npy')
+        _, y_test = np.asarray(load_inputs(speaker_path+'/val_segments.txt'))
+        # clf_svm = svm(speaker, X_train, y_train, X_test, y_test) 
+        # joblib.dump(clf_svm,speaker_path+'/model_svm.m')
+        clf_svm = joblib.load(speaker_path+'/model_svm.m')
+        with open(speaker_path+'/log_svm.txt', 'a') as f:
+            f.write('\n')
+            f.write(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()))
+            f.write('\n')
+            # f.write(str(pd.DataFrame.from_dict(clf_svm.cv_results_)))
+            # f.write(str(pd.DataFrame.from_dict(clf_svm.cv_results_, 'index')))
+            # f.write(str(clf_svm.cv_results_))
+            f.write('Cs: ' + str(clf_svm.cv_results_['param_estimator__C']))
+            f.write('gammas: ' + str(clf_svm.cv_results_['param_estimator__gamma']))
+
+    
+    
 
 def gmm(speaker, X_train, y_train, X_test, y_test, num_classes, num_components=16):
     '''
@@ -315,8 +348,9 @@ def draw_plt(x_axis,x_description, precision, recall, x_type='linear'):
 
 def main():
     berlin = Dataset('berlin')
+    get_SVMs(berlin)
     # fc_accuracy(berlin.speakers)
-    get_fc1(berlin.speakers)
+#    get_fc1(berlin.speakers)
 main()
 # test_classifier()
 
