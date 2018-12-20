@@ -17,18 +17,36 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.neighbors import KNeighborsClassifier
 import csv
 import matplotlib.pyplot as plt
+import time
 
 
 num_components = np.arange(2,32)
 list_neighbors = np.arange(10,200,10)
 
-def get_fc1(graph_filename, load_filename):
+def get_fc1(speakers, graph_filename='residual_model.pb'):
     dir_name = os.path.dirname(os.path.abspath('get_fc1.py'))
-    graph = load_graph(dir_name + '/' + graph_filename)
+    for speaker in speakers:
+        print('speaker '+ speaker +' now')
+        graph = load_graph(dir_name + '/EMODB/'+ speaker + '/' + graph_filename)
+        speaker_dir = dir_name + '/EMODB/'+ speaker + '/'
+        input_x = graph.get_tensor_by_name('model/input/input_x:0')
+        fc1 = graph.get_tensor_by_name('model/output/fully_connection_layers/fc1:0')
 
-    input_x = graph.get_tensor_by_name('model/input/input_x:0')
-    fc1 = graph.get_tensor_by_name('model/output/fully_connection_layers/fc1:0')
+        train_np_features_fc1, train_y_true = load_features(speaker_dir + 'train_segments.txt')
+        train_np_features_fc1 = np.asarray(train_np_features_fc1)
+        train_np_features_fc1 = train_np_features_fc1[:, :, :, np.newaxis]
 
+        val_np_features_fc1, val_y_true = load_features(speaker_dir + 'val_segments.txt')
+        val_np_features_fc1 = np.asarray(val_np_features_fc1)
+        val_np_features_fc1 = val_np_features_fc1[:, :, :, np.newaxis]
+
+        with tf.Session(graph=graph) as sess:
+            out = sess.run(fc1, feed_dict={input_x:train_np_features_fc1})
+            np.save(speaker_dir+'train_np_features_fc1.npy', out)
+            out = sess.run(fc1, feed_dict={input_x:val_np_features_fc1})
+            np.save(speaker_dir+'val_np_features_fc1.npy', out)
+
+'''
     paths, labels = load_inputs(dir_name + '/' + load_filename)
     features = []
     with tf.Session(graph=graph) as sess:
@@ -44,6 +62,34 @@ def get_fc1(graph_filename, load_filename):
             # print(out)
             features.append(out)
     return features, labels
+    '''
+
+def fc_accuracy(speakers, graph_filename='residual_model.pb'):
+    accuracies = np.zeros(len(speakers))
+    dir_name = os.path.dirname(os.path.abspath('get_fc1.py'))
+    for (i,speaker) in zip(range(len(speakers)), speakers):
+        print('speaker '+ speaker +' now')
+        graph = load_graph(dir_name + '/EMODB/'+ speaker + '/' + graph_filename)
+        input_x = graph.get_tensor_by_name('model/input/input_x:0')
+        fc2 = graph.get_tensor_by_name('model/output/fully_connection_layers/fc2:0')
+        # none sense input_y = graph.get_tensor_by_name('model/input/label_y:0')
+        # none sense accuracy = graph.get_tensor_by_name('model/accuracy/Mean:0')
+
+        np_features, y_true = load_features(dir_name + '/EMODB/'+ speaker + '/' + 'val_segments.txt')
+        np_features = np.asarray(np_features)
+        np_features = np_features[:,:,:,np.newaxis]
+        with tf.Session(graph=graph) as sess:
+            out = sess.run(fc2, feed_dict={input_x:np_features})
+        y_predict = np.argmax(out, axis=1)
+        accuracies[i] = accuracy_score(y_true, y_predict)
+
+
+    with open(dir_name + '/EMODB/'+ 'log.txt', 'a') as f:
+        f.write('\n')
+        f.write(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()))
+        temp = '   fc:' + str(accuracies) + ',aver=' + str(np.mean(accuracies))+ ', max=' + str(np.max(accuracies)) + ', min=' + str(np.min(accuracies)) +'\n'
+        f.write(temp)
+
 
 
 def load_graph(graph_filename):
@@ -60,6 +106,22 @@ def load_graph(graph_filename):
                             producer_op_list=None)
         return graph
 
+def load_features(filename):
+    np_file_paths = []
+    labels = []
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+        for line in lines:
+            item = line.split(' ')
+            np_file_paths.append(item[0])
+            # labels.append(tf.one_hot(int(item[1]), 7))
+            labels.append(int(item[1]))
+
+    np_features = []
+    for np_file_path in np_file_paths:
+        np_features.append(np.load(np_file_path))
+
+    return np_features, labels
 
 def load_inputs(filename):
     paths = []
@@ -251,4 +313,10 @@ def draw_plt(x_axis,x_description, precision, recall, x_type='linear'):
         os.mkdir('/savefig/')
     plt.savefig('/savefig/' + x_description)
 
-test_classifier()
+def main():
+    berlin = Dataset('berlin')
+    # fc_accuracy(berlin.speakers)
+    get_fc1(berlin.speakers)
+main()
+# test_classifier()
+
