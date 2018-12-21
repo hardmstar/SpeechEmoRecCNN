@@ -23,6 +23,11 @@ import matplotlib.pyplot as plt
 import time
 
 
+num_C = 9
+Cs = 10 ** np.arange(num_C) * 1e-4
+
+# gamma for rbf
+gammas = [1e-4, 1e-3, 1e-2, 1e-1, 1]
 num_components = np.arange(2,32)
 list_neighbors = np.arange(10,200,10)
 
@@ -156,11 +161,11 @@ def svm(speaker, X_train, y_train, X_test, y_test):
 
     ####svm model optimizing###
     # C from 0.01 to 16384 ( 0.01 * 2 ^14 ) ,
-    num_C = 9
-    Cs = 10 ** np.arange(num_C) * 1e-4
-
-    # gamma for rbf
-    gammas = [1e-4, 1e-3, 1e-2, 1e-1, 1]
+#    num_C = 9
+#    Cs = 10 ** np.arange(num_C) * 1e-4
+#
+#    # gamma for rbf
+#    gammas = [1e-4, 1e-3, 1e-2, 1e-1, 1]
     param_grid = {'estimator__C':Cs, 'estimator__gamma':gammas}
 
     train_val_features = np.concatenate((X_train,X_test), axis=0)
@@ -188,6 +193,8 @@ def svm(speaker, X_train, y_train, X_test, y_test):
 def get_SVMs(dt):
     # dt means dataset
     dir_name = os.path.dirname(os.path.abspath('get_fc1.py'))
+
+    mean_test_scores = np.zeros(len(Cs) * len(gammas))
     for speaker in dt.speakers:
         print('svm speaker '+speaker )
         speaker_path = dir_name + '/' + dt.root + '/' + speaker
@@ -198,16 +205,38 @@ def get_SVMs(dt):
         # clf_svm = svm(speaker, X_train, y_train, X_test, y_test) 
         # joblib.dump(clf_svm,speaker_path+'/model_svm.m')
         clf_svm = joblib.load(speaker_path+'/model_svm.m')
-        with open(speaker_path+'/log_svm.txt', 'a') as f:
-            f.write('\n')
-            f.write(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()))
-            f.write('\n')
-            # f.write(str(pd.DataFrame.from_dict(clf_svm.cv_results_)))
-            # f.write(str(pd.DataFrame.from_dict(clf_svm.cv_results_, 'index')))
-            # f.write(str(clf_svm.cv_results_))
-            f.write('Cs: ' + str(clf_svm.cv_results_['param_estimator__C']))
-            f.write('gammas: ' + str(clf_svm.cv_results_['param_estimator__gamma']))
+        mean_test_scores += clf_svm.cv_results_['mean_test_score']
+#        with open(speaker_path+'/log_svm.txt', 'a') as f:
+#            f.write('\n')
+#            f.write(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()))
+#            f.write('\n')
+#            # f.write(str(pd.DataFrame.from_dict(clf_svm.cv_results_)))
+#            # f.write(str(pd.DataFrame.from_dict(clf_svm.cv_results_, 'index')))
+#            # f.write(str(clf_svm.cv_results_))
+#            f.write('Cs: ' + str(clf_svm.cv_results_['param_estimator__C']))
+#            f.write('gammas: ' + str(clf_svm.cv_results_['param_estimator__gamma']))
 
+    mean_test_scores /= len(dt.speakers)
+    mean_test_scores = mean_test_scores.reshape(len(Cs), len(gammas))
+
+    # draw plot
+#    _, ax = plt.subplots(1,1)
+#    for ind,i in enumerate(gammas):
+#        ax.plot(Cs, mean_test_scores[:, ind], '-o',label='gamma: ' + str(i))
+#    ax.set_title('Grid Search Scores', fontsize=20, fontweight='bold')
+#    ax.set_xlabel('Cs')
+#    ax.set_ylabel('CV Mean Score', fontsize=16)
+#    ax.set_xscale('log')
+#    ax.legend(loc='best', fontsize=10)
+#    ax.grid('on')
+#    plt.show()
+    index = mean_test_scores.argmax(axis=1)
+    with open(dir_name + '/' + dt.root + '/log.txt', 'a') as f:
+        f.write('\n')
+        f.write(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()))
+        f.write('\n')
+        # f.write()
+        f.write('svm: best C=' + str(Cs[index]) + ', best gamma=' + str(gammas[index[1]]) + 'best average score=' + str(mean_test_scores[index]))
     
     
 
