@@ -288,6 +288,11 @@ def searchGMM(dt):
 
     # draw plot
     _, ax = plt.subplots(1,1)
+    max_index = np.argmax(gmm_accuracies)
+    ax.plot(num_components[max_index], gmm_accuracies[max_index], 'ks')
+    show_max = '(' + str(num_components[max_index]) + ', ' + str(round(gmm_accuracies[max_index],3)) + ')'
+    plt.annotate(show_max, xy=(num_components[max_index], gmm_accuracies[max_index]))
+ 
     ax.plot(num_components, gmm_accuracies, '-o')
     ax.set_title('GMM test Scores', fontsize=20, fontweight='bold')
     ax.set_xlabel('Number of Gaussian Components')
@@ -431,8 +436,8 @@ def draw_plt(x_axis,x_description, precision, recall, x_type='linear'):
 def main():
     berlin = Dataset('berlin')
 #    searchSVMs(berlin)
-    # searchGMM(berlin)
-    searchKNN(berlin)
+    searchGMM(berlin)
+    # searchKNN(berlin)
     # fc_accuracy(berlin.speakers)
 #    get_fc1(berlin.speakers)
 main()
