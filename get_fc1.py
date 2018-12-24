@@ -264,7 +264,8 @@ def gmm(speaker, X_train, y_train, X_test, y_test, num_classes, num_components=1
     train_score = accuracy_score(y_train, clf_y_train)
     test_score = accuracy_score(y_test, clf_y_test)
     # print('speaker {} in gmm classification, train accuracy: {}, test accuracy: {}'.format(speaker, train_score, test_score))
-    return train_score, test_score, clf_y_train, clf_y_test
+#    return train_score, test_score, clf_y_train, clf_y_test
+    return clfs
 
 def searchGMM(dt):
     # dt means dataset
@@ -287,20 +288,20 @@ def searchGMM(dt):
     gmm_accuracies /= len(dt.speakers)
 
     # draw plot
-    _, ax = plt.subplots(1,1)
-    max_index = np.argmax(gmm_accuracies)
-    ax.plot(num_components[max_index], gmm_accuracies[max_index], 'ks')
-    show_max = '(' + str(num_components[max_index]) + ', ' + str(round(gmm_accuracies[max_index],3)) + ')'
-    plt.annotate(show_max, xy=(num_components[max_index], gmm_accuracies[max_index]))
+#    _, ax = plt.subplots(1,1)
+#    max_index = np.argmax(gmm_accuracies)
+#    ax.plot(num_components[max_index], gmm_accuracies[max_index], 'ks')
+#    show_max = '(' + str(num_components[max_index]) + ', ' + str(round(gmm_accuracies[max_index],3)) + ')'
+#    plt.annotate(show_max, xy=(num_components[max_index], gmm_accuracies[max_index]))
  
-    ax.plot(num_components, gmm_accuracies, '-o')
-    ax.set_title('GMM test Scores', fontsize=20, fontweight='bold')
-    ax.set_xlabel('Number of Gaussian Components')
-    ax.set_ylabel('Mean Test Score', fontsize=16)
-#    ax.set_xscale('log')
-    ax.legend(loc='best', fontsize=10)
-    ax.grid('on')
-    plt.show()
+#    ax.plot(num_components, gmm_accuracies, '-o')
+#    ax.set_title('GMM test Scores', fontsize=20, fontweight='bold')
+#    ax.set_xlabel('Number of Gaussian Components')
+#    ax.set_ylabel('Mean Test Score', fontsize=16)
+##    ax.set_xscale('log')
+#    ax.legend(loc='best', fontsize=10)
+#    ax.grid('on')
+#    plt.show()
  
 
 def knn(speaker, X_train, y_train, X_test, y_test, num_neighbors=80):
@@ -314,7 +315,8 @@ def knn(speaker, X_train, y_train, X_test, y_test, num_neighbors=80):
     clf_y_train = clf.predict(X_train)
     clf_y_test = clf.predict(X_test)
 #    print('speaker {} in knn classification, train accuracy: {}, test accuracy: {}'.format(speaker, train_score,test_score))
-    return train_score, test_score, clf_y_train, clf_y_test
+#    return train_score, test_score, clf_y_train, clf_y_test
+    return clf
 
 def searchKNN(dt):
     # dt means dataset
@@ -353,58 +355,43 @@ def searchKNN(dt):
     ax.grid('on')
     plt.show()
  
-def test_classifier():
-    berlin = Dataset('berlin')
+def best_classifier(dt):
+    # dt means dataset
+    dir_name = os.path.dirname(os.path.abspath('get_fc1.py'))
+    speaker_scores_svm = []
+    speaker_scores_gmm = []
+    speaker_scores_knn = []
 
-    gmm_accuracy_mean = np.zeros(len(num_components))
+    for speaker in dt.speakers:
+        speaker_path = dir_name + '/' + dt.root + '/' + speaker
+        X_train = np.load(speaker_path + '/train_np_features_fc1.npy')
+        _, y_train = np.asarray(load_inputs(speaker_path+'/train_segments.txt'))
+        X_test = np.load(speaker_path + '/val_np_features_fc1.npy')
+        _, y_test = np.asarray(load_inputs(speaker_path+'/val_segments.txt'))
+        y_train = np.asarray(y_train,int)
+        y_test = np.asarray(y_test,int)
 
-    knn_accuracy_mean = np.zeros(len(list_neighbors))
+        
+        # generate models
+        clf_svm = OneVsRestClassifier(SVC(kernel='rbf',C=10,gamma=0.001)) 
+        clf_svm = clf_svm.fit(X_train, y_train)
+        clf_gmms = gmm(speaker, X_train, y_train, X_test, y_test, len(dt.classes), num_components=17)
+        clf_knn = knn(speaker, X_train, y_train, X_test, y_test, num_neighbors=30)
 
-    for speaker in berlin.speakers:
-        X_train_paths, y_train = load_inputs(berlin.root + speaker + '/train.txt')
-        X_test_paths, y_test = load_inputs(berlin.root + speaker + '/val.txt')
-        X_train = []
-        for path in X_train_paths:
-            file = find_file(path, 'statistic')
-            with open(path + '/' + file, 'r') as f:
-                reader = csv.reader(f)
-                for item in reader:
-                    X_train.append(item[0].split(';')[1:])
-        X_test = []
-        for path in X_test_paths:
-            file = find_file(path, 'statistic')
-            with open(path + '/' + file, 'r') as f:
-                reader = csv.reader(f)
-                for item in reader:
-                    X_test.append(item[0].split(';')[1:])
-        X_train = np.asarray(X_train, dtype='float32')
-        X_test = np.asarray(X_test, dtype='float32')
-        y_train = np.asarray(y_train, dtype='int')
-        y_test = np.asarray(y_test, dtype='int')
+        # save models
+        joblib.dump(clf_svm,speaker_path+'/model_svm_best.m')
+        for (ind,clf_gmm) in enumerate(clf_gmms):
+            if not os.path.exists(speaker_path+'/gmm'):
+                os.mkdir(speaker_path+'/gmm/')
+            joblib.dump(clf_gmm, speaker_path+'/gmm/model_gmm_best_'+ str(ind) +'.m')
+        joblib.dump(clf_knn, speaker_path+'/model_knn_best.m')
 
-#for C in Cs:
-        '''
-        for i in range(num_C):
-            train_accuracys[i], test_accuracys[i], _, _ = svm(speaker, X_train, y_train, X_test, y_test, Cs[i])
-        svm_train_accuracys_mean += train_accuracys
-        svm_test_accuracys_mean += test_accuracys
-        '''
-        # gmm_accuracy_mean += searchGMM(speaker,X_train, y_train, X_test, y_test, len(berlin.classes))
-
-        knn_accuracy_mean += searchKNN(speaker,X_train, y_train, X_test, y_test)
-
-        #svm(speaker, X_train, y_train, X_test, y_test)
-        #gmm(speaker, X_train, y_train, X_test, y_test, len(berlin.classes))
-        knn(speaker, X_train, y_train, X_test, y_test)
-    # svm_train_accuracys_mean /= len(berlin.speakers)
-    # svm_test_accuracys_mean /= len(berlin.speakers)
-    # draw_plt(Cs, 'C in svm', svm_test_accuracys_mean, svm_train_accuracys_mean, 'log')
-
-    # gmm_accuracy_mean /= len(berlin.speakers)
-    # draw_plt(num_components, 'components in gmm', gmm_accuracy_mean, np.ones(len(num_components)), 'linear')
-
-    knn_accuracy_mean /= len(berlin.speakers)
-    draw_plt(list_neighbors, 'neighbors number in knn', knn_accuracy_mean, np.ones(len(list_neighbors)), 'linear')
+        # load models
+        clf_svm = joblib.load(speaker_path+'/model_svm.m')
+        clf_gmms = []
+        for (ind,emotion) in enumerate(dt.classes):
+            clf_gmms.append(joblib.load(speaker_path+'/gmm/model_gmm_best_'+ str(ind) +'.m'))
+        clf_knn = joblib.load(speaker_path+'/model_knn_best.m')
 
 
 def find_file(path, keyword):
@@ -436,10 +423,11 @@ def draw_plt(x_axis,x_description, precision, recall, x_type='linear'):
 def main():
     berlin = Dataset('berlin')
 #    searchSVMs(berlin)
-    searchGMM(berlin)
+    # searchGMM(berlin)
     # searchKNN(berlin)
     # fc_accuracy(berlin.speakers)
 #    get_fc1(berlin.speakers)
+    best_classifier(berlin)
 main()
 # test_classifier()
 
