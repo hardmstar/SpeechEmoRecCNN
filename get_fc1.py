@@ -75,21 +75,33 @@ def get_fc1(speakers, graph_filename='residual_model.pb'):
 def fc_accuracy(speakers, graph_filename='residual_model.pb'):
     accuracies = np.zeros(len(speakers))
     dir_name = os.path.dirname(os.path.abspath('get_fc1.py'))
-    for (i,speaker) in zip(range(len(speakers)), speakers):
-        print('speaker '+ speaker +' now')
-        graph = load_graph(dir_name + '/EMODB/'+ speaker + '/' + graph_filename)
-        input_x = graph.get_tensor_by_name('model/input/input_x:0')
-        fc2 = graph.get_tensor_by_name('model/output/fully_connection_layers/fc2:0')
-        # none sense input_y = graph.get_tensor_by_name('model/input/label_y:0')
-        # none sense accuracy = graph.get_tensor_by_name('model/accuracy/Mean:0')
-
-        np_features, y_true = load_features(dir_name + '/EMODB/'+ speaker + '/' + 'val_segments.txt')
-        np_features = np.asarray(np_features)
-        np_features = np_features[:,:,:,np.newaxis]
-        with tf.Session(graph=graph) as sess:
-            out = sess.run(fc2, feed_dict={input_x:np_features})
-        y_predict = np.argmax(out, axis=1)
-        accuracies[i] = accuracy_score(y_true, y_predict)
+    confusion_matrix_fc = np.zeros([7,7])
+#    for (i,speaker) in zip(range(len(speakers)), speakers):
+#        print('speaker '+ speaker +' now')
+#        graph = load_graph(dir_name + '/EMODB/'+ speaker + '/' + graph_filename)
+#        input_x = graph.get_tensor_by_name('model/input/input_x:0')
+#        fc2 = graph.get_tensor_by_name('model/output/fully_connection_layers/fc2:0')
+#        # none sense input_y = graph.get_tensor_by_name('model/input/label_y:0')
+#        # none sense accuracy = graph.get_tensor_by_name('model/accuracy/Mean:0')
+#
+#        np_features, y_true = load_features(dir_name + '/EMODB/'+ speaker + '/' + 'val_segments.txt')
+#        np_features = np.asarray(np_features)
+#        np_features = np_features[:,:,:,np.newaxis]
+#        with tf.Session(graph=graph) as sess:
+#            out = sess.run(fc2, feed_dict={input_x:np_features})
+#        y_predict = np.argmax(out, axis=1)
+#        accuracies[i] = accuracy_score(y_true, y_predict)
+#        labels = np.arange(7)
+#        cm_fc = confusion_matrix(y_true, y_predict, labels=labels)
+#        # normalize confusion matrix
+#        cm_fc = cm_fc.astype('float') / (cm_fc.sum(axis=1)[:, np.newaxis]+ 1e-7)
+#        confusion_matrix_fc += cm_fc
+#    confusion_matrix_fc /= len(speakers)
+#    np.save(dir_name + '/EMODB/'+'confusion_matrix_fc.npy', confusion_matrix_fc)
+    confusion_matrix_fc = np.load(dir_name + '/EMODB/'+'confusion_matrix_fc.npy')
+    confusion_matrix_fc.astype('float')
+    
+    return confusion_matrix_fc
 
 
     with open(dir_name + '/EMODB/'+ 'log.txt', 'a') as f:
@@ -195,17 +207,20 @@ def searchSVMs(dt):
     dir_name = os.path.dirname(os.path.abspath('get_fc1.py'))
 
     mean_test_scores = np.zeros(len(Cs) * len(gammas))
-    for speaker in dt.speakers:
+    speaker_scores_svm = np.zeros(len(dt.speakers))
+    for (i,speaker) in enumerate(dt.speakers):
         print('svm speaker '+speaker )
         speaker_path = dir_name + '/' + dt.root + '/' + speaker
         X_train = np.load(speaker_path + '/train_np_features_fc1.npy')
         _, y_train = np.asarray(load_inputs(speaker_path+'/train_segments.txt'))
         X_test = np.load(speaker_path + '/val_np_features_fc1.npy')
         _, y_test = np.asarray(load_inputs(speaker_path+'/val_segments.txt'))
-        # clf_svm = svm(speaker, X_train, y_train, X_test, y_test) 
-        # joblib.dump(clf_svm,speaker_path+'/model_svm.m')
-        clf_svm = joblib.load(speaker_path+'/model_svm.m')
+#        clf_svm = svm(speaker, X_train, y_train, X_test, y_test) 
+#        joblib.dump(clf_svm,speaker_path+'/model_svm_cv.m')
+        clf_svm = joblib.load(speaker_path+'/model_svm_cv.m')
         mean_test_scores += clf_svm.cv_results_['mean_test_score']
+        print(clf_svm.cv_results_['mean_test_score'])
+        speaker_scores_svm[i] = clf_svm.score(X_test, y_test)
 #        with open(speaker_path+'/log_svm.txt', 'a') as f:
 #            f.write('\n')
 #            f.write(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()))
@@ -236,7 +251,9 @@ def searchSVMs(dt):
         f.write(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()))
         f.write('\n')
         # f.write()
-        f.write('svm: best C=' + str(Cs[index[0][0]]) + ', best gamma=' + str(gammas[index[1][0]]) + 'best average score=' + str(mean_test_scores[index]))
+        f.write('svm cv: best C=' + str(Cs[index[0][0]]) + ', best gamma=' + str(gammas[index[1][0]]) + 'best average score=' + str(mean_test_scores[index])+ '\n') 
+        temp = 'svm cv test socres: '+str(speaker_scores_svm)+', aver='+str(np.mean(speaker_scores_svm))+', max='+str(np.max(speaker_scores_svm))+', min='+str(np.min(speaker_scores_svm))+'\n'
+        f.write(temp)
     
     
 
@@ -358,11 +375,15 @@ def searchKNN(dt):
 def best_classifier(dt):
     # dt means dataset
     dir_name = os.path.dirname(os.path.abspath('get_fc1.py'))
-    speaker_scores_svm = []
-    speaker_scores_gmm = []
-    speaker_scores_knn = []
+    speaker_scores_svm = np.zeros(len(dt.speakers))
+    speaker_scores_gmm = np.zeros(len(dt.speakers))
+    speaker_scores_knn = np.zeros(len(dt.speakers))
 
-    for speaker in dt.speakers:
+    confusion_matrix_svm = np.zeros([len(dt.classes), len(dt.classes)])
+    confusion_matrix_gmm = np.zeros([len(dt.classes), len(dt.classes)])
+    confusion_matrix_knn = np.zeros([len(dt.classes), len(dt.classes)])
+
+    for (index,speaker) in enumerate(dt.speakers):
         speaker_path = dir_name + '/' + dt.root + '/' + speaker
         X_train = np.load(speaker_path + '/train_np_features_fc1.npy')
         _, y_train = np.asarray(load_inputs(speaker_path+'/train_segments.txt'))
@@ -373,25 +394,76 @@ def best_classifier(dt):
 
         
         # generate models
-        clf_svm = OneVsRestClassifier(SVC(kernel='rbf',C=10,gamma=0.001)) 
-        clf_svm = clf_svm.fit(X_train, y_train)
-        clf_gmms = gmm(speaker, X_train, y_train, X_test, y_test, len(dt.classes), num_components=17)
-        clf_knn = knn(speaker, X_train, y_train, X_test, y_test, num_neighbors=30)
+#        clf_svm = OneVsRestClassifier(SVC(kernel='rbf',C=10,gamma=0.001)) 
+#        clf_svm = clf_svm.fit(X_train, y_train)
+#        clf_gmms = gmm(speaker, X_train, y_train, X_test, y_test, len(dt.classes), num_components=17)
+#        clf_knn = knn(speaker, X_train, y_train, X_test, y_test, num_neighbors=30)
 
         # save models
-        joblib.dump(clf_svm,speaker_path+'/model_svm_best.m')
-        for (ind,clf_gmm) in enumerate(clf_gmms):
-            if not os.path.exists(speaker_path+'/gmm'):
-                os.mkdir(speaker_path+'/gmm/')
-            joblib.dump(clf_gmm, speaker_path+'/gmm/model_gmm_best_'+ str(ind) +'.m')
-        joblib.dump(clf_knn, speaker_path+'/model_knn_best.m')
-
+#        joblib.dump(clf_svm,speaker_path+'/model_svm_best.m')
+#        for (ind,clf_gmm) in enumerate(clf_gmms):
+#            if not os.path.exists(speaker_path+'/gmm'):
+#                os.mkdir(speaker_path+'/gmm/')
+#            joblib.dump(clf_gmm, speaker_path+'/gmm/model_gmm_best_'+ str(ind) +'.m')
+#        joblib.dump(clf_knn, speaker_path+'/model_knn_best.m')
+#
         # load models
         clf_svm = joblib.load(speaker_path+'/model_svm.m')
         clf_gmms = []
         for (ind,emotion) in enumerate(dt.classes):
             clf_gmms.append(joblib.load(speaker_path+'/gmm/model_gmm_best_'+ str(ind) +'.m'))
         clf_knn = joblib.load(speaker_path+'/model_knn_best.m')
+
+        # calculate test scores
+        svm_predict = clf_svm.predict(X_test)
+        svm_predict = np.asarray(svm_predict, dtype=np.int8)
+        speaker_scores_svm[index] = accuracy_score(y_test, svm_predict) 
+
+        log_likelihood_test = np.zeros([X_test.shape[0], len(dt.classes)])
+        for i in range(len(dt.classes)):
+            log_likelihood_test[:, i] = clf_gmms[i].score_samples(X_test)
+        clf_y_test = np.argmax(log_likelihood_test, axis=1)
+        speaker_scores_gmm[index] = accuracy_score(y_test, clf_y_test)
+
+        speaker_scores_knn[index] = clf_knn.score(X_test, y_test)
+        knn_predict = clf_knn.predict(X_test)
+
+        # calculate confusion matrix
+        labels = np.arange(len(dt.classes))
+        cm_svm = confusion_matrix(y_test, svm_predict, labels=labels)
+        cm_gmm = confusion_matrix(y_test, clf_y_test , labels=labels)
+        cm_knn = confusion_matrix(y_test, knn_predict, labels=labels)
+        # normalize confusion matrix
+        cm_svm = cm_svm.astype('float') / (cm_svm.sum(axis=1)[:, np.newaxis]+ 1e-7)
+        cm_gmm = cm_gmm.astype('float') / (cm_gmm.sum(axis=1)[:, np.newaxis]+ 1e-7)
+        cm_knn = cm_knn.astype('float') / (cm_knn.sum(axis=1)[:, np.newaxis]+ 1e-7)
+        #
+        confusion_matrix_svm += cm_svm
+        confusion_matrix_gmm += cm_gmm
+        confusion_matrix_knn += cm_knn 
+
+    confusion_matrix_svm /= len(dt.speakers)
+    confusion_matrix_gmm /= len(dt.speakers)
+    confusion_matrix_knn /= len(dt.speakers)
+    with open(dir_name + '/EMODB/'+ 'log.txt', 'a') as f:
+        f.write('\n')
+        f.write(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()))
+        f.write('\n')
+        temp = 'svm test socres: '+str(speaker_scores_svm)+', aver='+str(np.mean(speaker_scores_svm))+', max='+str(np.max(speaker_scores_svm))+', min='+str(np.min(speaker_scores_svm))+'\n'
+        f.write(temp)
+        temp = 'gmm test socres: '+str(speaker_scores_gmm)+', aver='+str(np.mean(speaker_scores_gmm))+', max='+str(np.max(speaker_scores_gmm))+', min='+str(np.min(speaker_scores_gmm))+'\n'
+        f.write(temp)
+        temp = 'knn test socres: '+str(speaker_scores_knn)+', aver='+str(np.mean(speaker_scores_knn))+', max='+str(np.max(speaker_scores_knn))+', min='+str(np.min(speaker_scores_knn))+'\n'
+        f.write(temp)
+        f.write('\n')
+        f.write('svm \n')
+        f.write(str(confusion_matrix_svm))
+        f.write('gmm \n')
+        f.write(str(confusion_matrix_gmm))
+        f.write('knn \n')
+        f.write(str(confusion_matrix_knn))
+        f.write('/n')
+        return confusion_matrix_svm, confusion_matrix_gmm, confusion_matrix_knn
 
 
 def find_file(path, keyword):
@@ -420,14 +492,73 @@ def draw_plt(x_axis,x_description, precision, recall, x_type='linear'):
         os.mkdir('/savefig/')
     plt.savefig('/savefig/' + x_description)
 
+def plot_confusion_matrix(ax, cm, classes, title, cmap=plt.cm.Blues):
+    im = ax.imshow(cm, interpolation='nearest', cmap=cmap)
+    ax.set_title(title)
+    tick_marks = np.arange(len(classes))
+#    ax.set_xticks(tick_marks, classes, rotation=45)
+    ax.tick_params(axis='x', rotation=45)
+#    ax.set_xticks(tick_marks, classes)
+    ax.set_xticklabels(classes)
+#    ax.set_yticks(tick_marks, classes)
+    ax.set_yticklabels(classes)
+    fmt = '.2f'
+    thresh = cm.max() / 2.
+    for i,j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        ax.text(j,i, format(cm[i,j], fmt), horizontalalignment='center',color='white' if cm[i,j] > thresh else 'black')
+    
+
+def plot_confusion_matrix_single(cm, classes, title, cmap=plt.cm.Blues):
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+#    plt.title(title)
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=45)
+    plt.yticks(tick_marks, classes)
+    fmt = '.2f'
+    thresh = cm.max() / 2.
+    for i,j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j,i, format(cm[i,j], fmt), horizontalalignment='center',color='white' if cm[i,j] > thresh else 'black')
+    plt.tight_layout()
+    
+
+
 def main():
     berlin = Dataset('berlin')
-#    searchSVMs(berlin)
+    # searchSVMs(berlin)
     # searchGMM(berlin)
     # searchKNN(berlin)
     # fc_accuracy(berlin.speakers)
 #    get_fc1(berlin.speakers)
-    best_classifier(berlin)
+    cm_fc = fc_accuracy(berlin.speakers)
+    cm_svm, cm_gmm, cm_knn = best_classifier(berlin)
+    print(cm_fc)
+    print(cm_svm)
+    print(cm_gmm)
+    print(cm_knn)
+    EMODB_classes = {0: 'W', 1: 'L', 2: 'E', 3: 'A', 4: 'F', 5: 'T', 6: 'N'}
+    classes = ['anger', 'boredom', 'disgust', 'fear', 'happiness', 'sadness', 'neutral']
+
+#    fig, (ax_fc, ax_svm, ax_gmm, ax_knn) = plt.subplots(1,4)
+
+##    ax_fc = plt.subplot(1,4,1)
+#    ax_fc = plt.subplot(2,2,1)
+#    plot_confusion_matrix(ax_fc,   cm_fc, classes, title='a) FC Layer')
+##    ax_svm = plt.subplot(1,4,2)
+#    ax_svm = plt.subplot(2,2,2)
+#    plot_confusion_matrix(ax_svm, cm_svm, classes, title='b) SVM')
+##    ax_gmm = plt.subplot(1,4,3)
+#    ax_gmm = plt.subplot(2,2,3)
+#    plot_confusion_matrix(ax_gmm, cm_gmm, classes, title='c) GMM')
+##    ax_knn = plt.subplot(1,4,4)
+#    ax_knn = plt.subplot(2,2,4)
+#    plot_confusion_matrix(ax_knn, cm_knn, classes, title='d) KNN')
+
+    plot_confusion_matrix_single(cm_fc, classes, title='a) FC Layer')
+#    plot_confusion_matrix_single(cm_svm, classes, title='b) SVM')
+#    plot_confusion_matrix_single(cm_gmm, classes, title='c) GMM')
+#    plot_confusion_matrix_single(cm_knn, classes, title='d) KNN')
+    # plt.tight_layout()
+    plt.show()
 main()
 # test_classifier()
 
